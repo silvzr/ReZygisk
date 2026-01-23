@@ -441,7 +441,7 @@ bool _load_symtabs(ElfImg *img) {
   if (img->symtabs_) return true;
 
   if (!img->symtab_start || img->symstr_offset_for_symtab == 0 || img->symtab_count == 0) {
-    LOGE("Cannot load symtabs: .symtab section or its string table not found/valid.");
+    // LOGE("Cannot load symtabs: .symtab section or its string table not found/valid.");
 
     return false;
   }
@@ -606,7 +606,7 @@ ElfW(Addr) ElfLookup(ElfImg *restrict img, const char *restrict name, uint32_t h
 
 ElfW(Addr) LinearLookup(ElfImg *img, const char *restrict name, unsigned char *sym_type) {
   if (!_load_symtabs(img)) {
-    LOGE("Failed to load symtabs for linear lookup of %s", name);
+    // LOGE("Failed to load symtabs for linear lookup of %s", name);
 
     return 0;
   }
