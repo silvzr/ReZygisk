@@ -365,7 +365,7 @@ void *find_func_addr(struct maps *local_info, struct maps *remote_info, const ch
 
   uint8_t *sym = (uint8_t *)getSymbAddress(mod, func);
   if (sym == NULL) {
-    LOGE("failed to find symbol %s in %s", func, module);
+    // LOGE("failed to find symbol %s in %s", func, module);
 
     ElfImg_destroy(mod);
 
