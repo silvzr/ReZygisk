@@ -1,4 +1,5 @@
 #include <sys/mount.h>
+#include <sched.h>
 #include <dlfcn.h>
 #include <link.h>
 #include <regex.h>
@@ -19,6 +20,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <limits.h>
 
@@ -205,9 +207,9 @@ static void jni_hook_list_add(const char *class_name, JNINativeMethod *methods, 
   jni_hook_list_count++;
 }
 
-static bool update_mnt_ns(enum mount_namespace_state mns_state, bool dry_run) {
+static bool update_mnt_ns(enum mount_namespace_state mns_state, bool force_update, bool dry_run) {
   char ns_path[PATH_MAX];
-  if (!rezygiskd_update_mns(mns_state, ns_path, sizeof(ns_path))) {
+  if (!rezygiskd_update_mns(mns_state, force_update, ns_path, sizeof(ns_path))) {
     PLOGE("Failed to update mount namespace");
 
     return false;
@@ -372,6 +374,42 @@ DCL_HOOK_FUNC(int, property_get, const char *key, char *value, const char *defau
   hook_unloader();
 
   return old_property_get(key, value, default_value);
+}
+
+DCL_HOOK_FUNC(FILE *, setmntent, const char *filename, int type) {
+    int cpid = fork();
+    if (cpid < 0) {
+        LOGE("Failed to fork in setmntent: %s", strerror(errno));
+
+        return old_setmntent(filename, type);
+    }
+
+    if (cpid == 0) {
+        unshare(CLONE_NEWNS);
+
+        if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL) == -1) {
+            PLOGE("Failed to remount / as private in setmntent");
+
+            _exit(EXIT_FAILURE);
+        }
+
+        update_mnt_ns(Clean, false, true);
+
+        _exit(EXIT_SUCCESS);
+    }
+
+    waitpid(cpid, NULL, 0);
+    LOGD("setmntent called in child process %d", cpid);
+
+    update_mnt_ns(Clean, false, false);
+
+    return old_setmntent(filename, type);
+}
+
+DCL_HOOK_FUNC(int, endmntent, FILE *fp) {
+    update_mnt_ns(Mounted, false, false);
+
+    return old_endmntent(fp);
 }
 
 #undef DCL_HOOK_FUNC
@@ -980,7 +1018,7 @@ static void rz_app_specialize_pre(struct zygisk_context *ctx) {
                before it even does something, so that it will be clean yet
                with expected mounts.
     */
-    update_mnt_ns(Clean, true);
+    update_mnt_ns(Clean, true, true);
   }
 
   if ((ctx->info_flags & PROCESS_IS_MANAGER) == PROCESS_IS_MANAGER) {
@@ -1015,7 +1053,7 @@ static void rz_app_specialize_pre(struct zygisk_context *ctx) {
   bool in_denylist = (ctx->info_flags & PROCESS_ON_DENYLIST) == PROCESS_ON_DENYLIST;
   if (in_denylist) {
     FLAG_SET(ctx, DO_REVERT_UNMOUNT);
-    update_mnt_ns(Clean, false);
+    update_mnt_ns(Clean, false, false);
   }
 
   /* INFO: Executed after setns to ensure a module can update the mounts of an
@@ -1032,7 +1070,7 @@ static void rz_app_specialize_pre(struct zygisk_context *ctx) {
               the chance to request it.
   */
   if (!in_denylist && FLAG_GET(ctx, DO_REVERT_UNMOUNT))
-    update_mnt_ns(Clean, false);
+    update_mnt_ns(Clean, false, false);
 }
 
 static void rz_app_specialize_post(struct zygisk_context *ctx) {
@@ -1207,6 +1245,8 @@ void hook_functions(void) {
   PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, fork, false);
   PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, strdup, false);
   PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, property_get, false);
+  PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, setmntent, false);
+  PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, endmntent, false);
   PLT_HOOK_REGISTER_SYM(android_runtime_dev, android_runtime_inode, "_ZNK18FileDescriptorInfo14ReopenOrDetach", _ZNK18FileDescriptorInfo14ReopenOrDetach, true);
 
   if (!hook_commit(map_infos)) {
@@ -1215,6 +1255,8 @@ void hook_functions(void) {
     PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, fork, false);
     PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, strdup, false);
     PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, property_get, false);
+    PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, setmntent, false);
+    PLT_HOOK_REGISTER(android_runtime_dev, android_runtime_inode, endmntent, false);
 
     if (hook_commit(map_infos)) {
       LOGW("Hooked without ReopenOrDetach hook! Umounting overlays will cause problems");

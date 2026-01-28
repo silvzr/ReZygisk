@@ -695,9 +695,9 @@ bool umount_root(struct root_impl impl) {
   return true;
 }
 
-int save_mns_fd(int pid, enum MountNamespaceState mns_state, struct root_impl impl) {
-  if (mns_state == Clean && clean_namespace_fd != 0) return clean_namespace_fd;
-  if (mns_state == Mounted && mounted_namespace_fd != 0) return mounted_namespace_fd;
+int save_mns_fd(int pid, enum MountNamespaceState mns_state, bool force_update, struct root_impl impl) {
+  if (!force_update && mns_state == Clean && clean_namespace_fd != 0) return clean_namespace_fd;
+  if (!force_update && mns_state == Mounted && mounted_namespace_fd != 0) return mounted_namespace_fd;
 
   int sockets[2];
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
