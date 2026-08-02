@@ -45,11 +45,6 @@ struct ksu_get_manager_uid_cmd {
   uint32_t uid;
 };
 
-struct ksu_set_feature_cmd {
-  uint32_t feature_id;
-  uint64_t value;
-};
-
 struct ksu_get_hook_mode_cmd {
   char mode[16];
 };
@@ -57,7 +52,6 @@ struct ksu_get_hook_mode_cmd {
 #define KSU_IOCTL_UID_GRANTED_ROOT _IOC(_IOC_READ|_IOC_WRITE, 'K', 8, 0)
 #define KSU_IOCTL_UID_SHOULD_UMOUNT _IOC(_IOC_READ|_IOC_WRITE, 'K', 9, 0)
 #define KSU_IOCTL_GET_MANAGER_UID _IOC(_IOC_READ, 'K', 10, 0)
-#define KSU_IOCTL_SET_FEATURE _IOC(_IOC_WRITE, 'K', 14, 0)
 
 /* INFO: KernelSU-Next specific */
 #define KSU_IOCTL_GET_HOOK_MODE _IOC(_IOC_READ, 'K', 98, 0)
@@ -140,18 +134,6 @@ void ksu_get_existence(struct root_impl_state *state) {
   }
 
   ksu_uses_new_ksuctl = true;
-
-  struct ksu_set_feature_cmd cmd = {
-    .feature_id = 1, /* INFO: kernel_umount */
-    .value = 0
-  };
-
-  /* INFO: Tell KernelSU to not umount, and let us handle it */
-  if (ioctl(ksu_fd, KSU_IOCTL_SET_FEATURE, &cmd) == -1) {
-    LOGW("Failed to ioctl KSU_IOCTL_SET_FEATURE: %s\n", strerror(errno));
-
-    /* INFO: Not a fatal error, just log and continue */
-  }
 
   struct ksu_get_hook_mode_cmd hook_mode_cmd = { 0 };
   ioctl(ksu_fd, KSU_IOCTL_GET_HOOK_MODE, &hook_mode_cmd);
