@@ -1,6 +1,7 @@
 name: Trusted CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -13,6 +14,18 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0
+
+      - name: Sync upstream changes
+        if: github.event_name == 'workflow_dispatch'
+        uses: silvzr/Fork-Sync-With-Upstream-action@v3.4.3
+        with:
+          target_sync_repo: silvzr/ReZygisk
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_repo: PerformanC/ReZygisk
+          upstream_sync_branch: main
+          git_config_pull_rebase: true
+          target_branch_push_args: --force
 
       - name: Setup keys
         env:
