@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include <unistd.h>
+
 #include "../utils.h"
 #include "apatch.h"
 #include "kernelsu.h"
@@ -84,6 +86,10 @@ bool uid_granted_root(uid_t uid) {
 }
 
 bool uid_should_umount(uid_t uid, const char *const process) {
+  if (access("/data/adb/modules/rezygisk/disable_unmount", F_OK) == 0) {
+    return false;
+  }
+
   switch (impl.impl) {
     case KernelSU: {
       return ksu_uid_should_umount(uid);

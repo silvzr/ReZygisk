@@ -1,6 +1,6 @@
 import { loadPage } from '../pageLoader.js'
 import utils from '../utils.js'
-import { fullScreen } from '../../kernelsu.js'
+import { fullScreen, exec } from '../../kernelsu.js'
 
 function _writeState(ConfigState) {
   return localStorage.setItem('/ReZygisk/webui_config', JSON.stringify(ConfigState))
@@ -74,5 +74,23 @@ export async function load() {
     }
 
     _writeState(ConfigState)
+  })
+
+  const rz_webui_umount_toggle = document.getElementById('rz_webui_umount_toggle')
+
+  exec("[ -e '/data/adb/modules/rezygisk/disable_unmount' ]").then(result => {
+    if (result.errno === 0) {
+      rz_webui_umount_toggle.checked = true
+    }
+  })
+
+  utils.addListener(rz_webui_umount_toggle, 'click', () => {
+    const disabled = rz_webui_umount_toggle.checked
+
+    if (disabled) {
+      exec("touch /data/adb/modules/rezygisk/disable_unmount")
+    } else {
+      exec("rm -f /data/adb/modules/rezygisk/disable_unmount")
+    }
   })
 }

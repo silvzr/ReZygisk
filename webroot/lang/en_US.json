@@ -62,6 +62,10 @@
         "title": "Enable system font",
         "description": "This option will enable system font in current WebUI. NOTE: May not be compatible with FlipFont"
       },
+      "unmount": {
+        "title": "Disable zygisk umount",
+        "description": "This option will disable zygisk-based modules unmount. For debugging purposes only"
+      },
       "moduleDevelopers": "Module Developer(s)",
       "WebUIDevelopers": "WebUI Developer(s)",
       "orginalDevelopers": "Original Module Developer(s)",
